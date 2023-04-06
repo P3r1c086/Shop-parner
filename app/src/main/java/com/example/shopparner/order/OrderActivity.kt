@@ -10,7 +10,11 @@ import com.example.shopparner.chat.ChatFragment
 import com.example.shopparner.databinding.ActivityOrderBinding
 import com.example.shopparner.entities.Order
 import com.example.shopparner.fcm.NotificationRS
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.analytics.ktx.analytics
+import com.google.firebase.analytics.ktx.logEvent
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.ktx.Firebase
 
 class OrderActivity : AppCompatActivity(), OnOrderListener, OrderAux {
 
@@ -19,6 +23,8 @@ class OrderActivity : AppCompatActivity(), OnOrderListener, OrderAux {
     private lateinit var adapter: OrderAdapter
 
     private lateinit var orderSelected: Order
+
+    private lateinit var firebaseAnalytics: FirebaseAnalytics
 
     //con estas dos variables tendremos acceso a los arrays de valores y claves
     private val aValues: Array<String> by lazy {
@@ -36,6 +42,7 @@ class OrderActivity : AppCompatActivity(), OnOrderListener, OrderAux {
 
         setupRecyclerView()
         setupFirestore()
+        configAnalytics()
     }
     private fun setupRecyclerView() {
         adapter = OrderAdapter(mutableListOf(), this)
@@ -62,6 +69,10 @@ class OrderActivity : AppCompatActivity(), OnOrderListener, OrderAux {
                 Toast.makeText(this, "Error al consultar los datos.", Toast.LENGTH_SHORT)
                     .show()
             }
+    }
+
+    private fun configAnalytics(){
+        firebaseAnalytics = Firebase.analytics
     }
 
     private fun notifyClient(order: Order){
@@ -133,6 +144,17 @@ class OrderActivity : AppCompatActivity(), OnOrderListener, OrderAux {
                 //Al cambiar de estado podemos enviarle al cliente una notificacion de que el estado
                 // de su pedido ha cambiado
                 notifyClient(order)
+                //Analytics
+                firebaseAnalytics.logEvent(FirebaseAnalytics.Event.ADD_SHIPPING_INFO){
+                    val product = mutableListOf<Bundle>()
+                    order.products.forEach{
+                        val bundle = Bundle()
+                        bundle.putString("id_product", it.key)
+                        product.add(bundle)
+                    }
+                    param(FirebaseAnalytics.Param.SHIPPING, product.toTypedArray())
+                    param(FirebaseAnalytics.Param.PRICE, order.totalPrice)
+                }
             }
             .addOnFailureListener {
                 Toast.makeText(this, "Error al actualizar orden.", Toast.LENGTH_SHORT).show()
