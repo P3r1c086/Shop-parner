@@ -16,6 +16,7 @@ object Constants {
     const val COLL_REQUESTS = "requests"
 
     const val PROP_STATUS = "status"
+    const val PROP_DATE = "date"
     //realtime database
     const val PATH_CHATS = "chats"
 
