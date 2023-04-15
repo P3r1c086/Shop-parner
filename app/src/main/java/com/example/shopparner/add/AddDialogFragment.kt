@@ -4,7 +4,10 @@ import android.app.Activity
 import android.app.Dialog
 import android.content.DialogInterface
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
@@ -22,8 +25,10 @@ import com.example.shopparner.entities.EventPost
 import com.example.shopparner.entities.Product
 import com.example.shopparner.databinding.FragmentDialogAddBinding
 import com.example.shopparner.product.MainAux
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import java.io.ByteArrayOutputStream
 
 /**
  * Proyect: Shop Parner
@@ -106,7 +111,8 @@ class AddDialogFragment : DialogFragment(), DialogInterface.OnShowListener {
                 binding?.let {
                     enableUI(false)//esto hace que se bloquee el dialog
                     //subir imagen al storage. Recibe un callBack
-                    uploadImage(product?.id) { eventPost ->
+//                    uploadImage(product?.id) { eventPost ->
+                    uploadReducedImage(product?.id) { eventPost ->
                         //si la imagen fue subida correctamente
                         if (eventPost.isSuccess){
                             if (product == null){//si el producto es null, lo creamos
@@ -239,6 +245,96 @@ class AddDialogFragment : DialogFragment(), DialogInterface.OnShowListener {
             }
         }
     }
+    /**
+     * metodo para subir imagenes comprimidas al storage
+     */
+    private fun uploadReducedImage(productId: String?, callback: (EventPost)->Unit){ //que retorna Unit sig que no retorna nada
+        //creamos una nueva instancia de EventPost, la cual va a contener el documento
+        val eventPost = EventPost()
+        //El sigo de Elvis, hace que en caso de que sea null, agarre el id del nuevo documento, sino
+        // que se quede con el id del producto actual.
+        //extraemos el id del document. Estamos reservando un lugar para que la imagen que subamos
+        // tenga como nombre este id. Posteriormente, una vez que termine el proceso de subir vamos a
+        // regresar ese documento para que la imagen que vayamos a subir sea asignada con el nombre
+        // de este id y posteriormente, despues de que se suba nuestra imagen, ahora si, vamos a
+        // agarra el mismo document id para insertar un nuevo registro
+        eventPost.documentId = productId ?: FirebaseFirestore.getInstance()
+            .collection(Constants.COLL_PRODUCTS).document().id
+
+        //verificamos que el usuario autenticado sea valido
+        FirebaseAuth.getInstance().currentUser?.let { user ->
+            //hacemos referencia a la carpeta contenedora de cada usuario
+            val imageRef = FirebaseStorage.getInstance().reference.child(user.uid)
+                //ponemos como hijo una carpeta donde almacenar las imagenes
+                .child(Constants.PATH_PRODUCT_IMAGES)
+            //creamos una nueva referencia que apunta al id de la foto
+            val photoRef = imageRef.child(eventPost.documentId!!)
+            //si photoSelectedUri es != de null y binding tb
+            photoSelectedUri?.let { uri ->
+                binding?.let { binding ->
+                    //validamos que el metodo de getBitmapFromUri no es null
+                    getBitmapFromUri(uri)?.let { bitmap ->
+                        //ahora subimos la imagen en formato bitmap
+                        //hacemos visible el progressbar
+                        binding.progressBar.visibility = View.VISIBLE
+
+                        //subiremos la foto en vez de con un URL, con un BitMap
+                        val baos = ByteArrayOutputStream()
+                        //comprimimos el bitmap. JPEG es el formato con menos peso
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, baos)
+                        //comenzamos a subir la imagen. uri es photoSelectedUri
+                        photoRef.putBytes(baos.toByteArray())
+                            //para la barra de progreso al subir la foto
+                            .addOnProgressListener {
+                                //con esto obtenemos los bytes tranferidos respecto al total
+                                val progress = (100 * it.bytesTransferred / it.totalByteCount).toInt()
+                                it.run {
+                                    binding.progressBar.progress = progress
+                                    binding.tvProgress.text = String.format("%s%%", progress)
+                                }
+                            }
+                            .addOnSuccessListener {
+                                //extraemos la url para descargar
+                                it.storage.downloadUrl.addOnSuccessListener { downloadUrl ->
+                                    Log.i("URL", downloadUrl.toString())
+                                    //la imagen ya ha sido subida al storage con putFile, ahora vamos a insertarla en Firestore
+                                    eventPost.isSuccess = true
+                                    eventPost.photoUrl = downloadUrl.toString()
+                                    callback(eventPost)
+                                }
+                            }
+                            .addOnFailureListener{
+                                Toast.makeText(activity, "Error al subir imagen.", Toast.LENGTH_SHORT).show()
+                                eventPost.isSuccess = false
+                                //hacemos que el dialog vuelva a estar disponible
+                                enableUI(true)
+                                callback(eventPost)
+                            }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Metodo para no saturar el proceso de construir un BitMap a partir de nuestra URI
+     */
+    private fun getBitmapFromUri(uri: Uri): Bitmap?{
+        //verificamos si nuestra activity es diferente de null
+        activity?.let {
+            //construimos un bitmap. Para versiones mas modernas de android se hara asi
+            val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P){
+                val source = ImageDecoder.createSource(it.contentResolver, uri)
+                ImageDecoder.decodeBitmap(source)
+            }else{
+                //para versiones anteriores a android P se hara de esta forma
+                MediaStore.Images.Media.getBitmap(it.contentResolver, uri)
+            }
+            return  bitmap
+        }
+        return null//retornamos null en caso de que la activity sea null
+    }
+
 
     private fun save(product: Product, documentId: String){
         //creamos una instancia de la base de datos de Firestore
