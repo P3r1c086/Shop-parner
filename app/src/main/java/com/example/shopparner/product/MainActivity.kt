@@ -18,6 +18,7 @@ import com.example.shopparner.order.OrderActivity
 import com.firebase.ui.auth.AuthUI
 import com.firebase.ui.auth.ErrorCodes
 import com.firebase.ui.auth.IdpResponse
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.analytics.ktx.logEvent
@@ -26,6 +27,7 @@ import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.FirebaseStorage
 
 class MainActivity : AppCompatActivity(), OnProductListener, MainAux {
 
@@ -281,20 +283,40 @@ class MainActivity : AppCompatActivity(), OnProductListener, MainAux {
         AddDialogFragment().show(supportFragmentManager, AddDialogFragment::class.java.simpleName)
     }
 
+    /**
+     * Metodo para borrar un producto
+     */
     override fun onLongClick(product: Product) {
-        //hacemos una instancia a la bd
-        val db = FirebaseFirestore.getInstance()
-        //creamos una referencia a la coleccion donde estan todos los productos
-        val productRef = db.collection(Constants.COLL_PRODUCTS)
-        //ahora hay que puntualizar cual de ellos queremos eliminar
-        product.id?.let { id ->
-            productRef.document(id)
-            //ya estamos posicionado en el documento en especifico
-                .delete()
-                .addOnFailureListener {
-                    Toast.makeText(this, "Error al eliminar.", Toast.LENGTH_SHORT).show()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.product_dialog_delete_title)
+            .setMessage(R.string.product_dialog_delete_msg)
+            .setPositiveButton(R.string.product_dialog_delete_confirm){_,_ ->
+                //hacemos una instancia a la bd
+                val db = FirebaseFirestore.getInstance()
+                //creamos una referencia a la coleccion donde estan todos los productos
+                val productRef = db.collection(Constants.COLL_PRODUCTS)
+                //ahora hay que puntualizar cual de ellos queremos eliminar
+                product.id?.let { id ->
+                    //hacemos referencia a fireStorage, en concreto, al id del producto para borrarlo
+                    FirebaseStorage.getInstance().reference
+                        //ponemos como hijo una carpeta donde almacenar las imagenes
+                        .child(Constants.PATH_PRODUCT_IMAGES)
+                        .child(id).delete()
+                        .addOnSuccessListener {
+                            productRef.document(id)
+                                //ya estamos posicionado en el documento en especifico
+                                .delete()
+                                .addOnFailureListener {
+                                    Toast.makeText(this, "Error al eliminar registro.", Toast.LENGTH_SHORT).show()
+                                }
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(this, "Error al eliminar foto.", Toast.LENGTH_SHORT).show()
+                        }
                 }
-        }
+            }
+            .setNegativeButton(R.string.dialog_cancel, null)
+            .show()
     }
 
     //va a devolver la variable global productSelected
