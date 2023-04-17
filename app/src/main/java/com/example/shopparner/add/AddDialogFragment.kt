@@ -281,7 +281,7 @@ class AddDialogFragment : DialogFragment(), DialogInterface.OnShowListener {
                         //subiremos la foto en vez de con un URL, con un BitMap
                         val baos = ByteArrayOutputStream()
                         //comprimimos el bitmap. JPEG es el formato con menos peso
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, baos)
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos)
                         //comenzamos a subir la imagen. uri es photoSelectedUri
                         photoRef.putBytes(baos.toByteArray())
                             //para la barra de progreso al subir la foto
@@ -330,11 +330,33 @@ class AddDialogFragment : DialogFragment(), DialogInterface.OnShowListener {
                 //para versiones anteriores a android P se hara de esta forma
                 MediaStore.Images.Media.getBitmap(it.contentResolver, uri)
             }
-            return  bitmap
+            return  getResizedImage(bitmap, 320)
         }
         return null//retornamos null en caso de que la activity sea null
     }
 
+    /**
+     * Metodo para redimensionar las imagenes
+     */
+    private fun getResizedImage(image: Bitmap, maxSize: Int): Bitmap{
+        var width = image.width
+        var height = image.height
+        if (width <= maxSize && height <= maxSize) return image
+
+        //si entra aqui es porque la imagen tiene una dimension mas grande que el tamaña max
+        val bitmapRatio = width.toFloat() / height.toFloat()
+        if (bitmapRatio > 1){
+            width = maxSize
+            //la altura sera de un tamaño proporcional
+            height = (width / bitmapRatio).toInt()
+        }else{
+            height = maxSize
+            //la anchura sera de un tamaño proporcional
+            width = (height / bitmapRatio).toInt()
+        }
+        //procedemos a crear esa escala del bitmap
+        return Bitmap.createScaledBitmap(image, width, height, true)
+    }
 
     private fun save(product: Product, documentId: String){
         //creamos una instancia de la base de datos de Firestore

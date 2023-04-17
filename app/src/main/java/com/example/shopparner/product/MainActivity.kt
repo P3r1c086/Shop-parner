@@ -297,22 +297,26 @@ class MainActivity : AppCompatActivity(), OnProductListener, MainAux {
                 val productRef = db.collection(Constants.COLL_PRODUCTS)
                 //ahora hay que puntualizar cual de ellos queremos eliminar
                 product.id?.let { id ->
-                    //hacemos referencia a fireStorage, en concreto, al id del producto para borrarlo
-                    FirebaseStorage.getInstance().reference
+                    product.imgUrl?.let { url ->
+                        //extraemos la referencia en base a la url
+                        //hacemos referencia a fireStorage, en concreto, al id del producto para borrarlo
                         //ponemos como hijo una carpeta donde almacenar las imagenes
-                        .child(Constants.PATH_PRODUCT_IMAGES)
-                        .child(id).delete()
-                        .addOnSuccessListener {
-                            productRef.document(id)
-                                //ya estamos posicionado en el documento en especifico
-                                .delete()
-                                .addOnFailureListener {
-                                    Toast.makeText(this, "Error al eliminar registro.", Toast.LENGTH_SHORT).show()
-                                }
-                        }
-                        .addOnFailureListener {
-                            Toast.makeText(this, "Error al eliminar foto.", Toast.LENGTH_SHORT).show()
-                        }
+                        val photRef = FirebaseStorage.getInstance().getReferenceFromUrl(url)
+//                        FirebaseStorage.getInstance().reference.child(Constants.PATH_PRODUCT_IMAGES).child(id)
+                        photRef
+                            .delete()
+                            .addOnSuccessListener {
+                                productRef.document(id)
+                                    //ya estamos posicionado en el documento en especifico
+                                    .delete()
+                                    .addOnFailureListener {
+                                        Toast.makeText(this, "Error al eliminar registro.", Toast.LENGTH_SHORT).show()
+                                    }
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(this, "Error al eliminar foto.", Toast.LENGTH_SHORT).show()
+                            }
+                    }
                 }
             }
             .setNegativeButton(R.string.dialog_cancel, null)
