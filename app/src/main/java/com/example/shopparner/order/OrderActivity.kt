@@ -108,11 +108,13 @@ class OrderActivity : AppCompatActivity(), OnOrderListener, OrderAux {
                     //extraemos el valor del estado actual
                     val index = aKeys.indexOf(order.status)
 
+                    val id = order.id
+
                     val notificationRS = NotificationRS()
                     //"aValues[index]" indica el estado del pedido
                     notificationRS.sendNotification(
                         "Tu pedido ha sido ${aValues[index]}",
-                        names, tokensStr
+                        names, tokensStr, id, order.status
                     )
                 }
             }

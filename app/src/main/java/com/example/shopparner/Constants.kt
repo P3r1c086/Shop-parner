@@ -8,6 +8,9 @@ package com.example.shopparner
  * All rights reserved 2022
  **/
 object Constants {
+    const val SUCCESS = true
+    const val ERROR = false
+
     const val COLL_PRODUCTS = "products"
     const val COLL_USERS = "users"
     const val COLL_TOKENS = "tokens"
@@ -23,12 +26,17 @@ object Constants {
     //FCM
     const val SHOP_PARNER_RS = "https://shopparner.000webhostapp.com/ShopParner/NiloRS.php"
     const val SEND_NOTIFICATION = "sendNotification"
+    const val SEND_NOTIFICATION_BY_TOPIC = "sendNotificationByTopic"
 
     const val PARAM_METHOD = "method"
     const val PARAM_TITLE = "title"
     const val PARAM_MESSAGE = "message"
     const val PARAM_TOKENS = "tokens"
     const val PARAM_SUCCESS = "success"
-    //FCM
+    const val PARAM_TOPIC = "topic"
+    const val PARAM_IMAGE = "image"
+    const val PARAM_ID = "id"
+    const val PARAM_STATUS = "status"
+
     const val PROP_TOKEN = "token"
 }
