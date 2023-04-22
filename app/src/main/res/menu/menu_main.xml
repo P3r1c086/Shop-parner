@@ -6,6 +6,10 @@
         android:title="Cerrar sesión"
         app:showAsAction="never"/>
     <item
+        android:id="@+id/action_promo"
+        android:title="@string/action_promo"
+        app:showAsAction="never"/>
+    <item
         android:id="@+id/action_order_history"
         android:title=""
         android:icon="@drawable/ic_history"
