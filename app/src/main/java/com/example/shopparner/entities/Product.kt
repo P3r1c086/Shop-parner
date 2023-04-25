@@ -18,7 +18,8 @@ data class Product(@get:Exclude var id: String? = null,
                    var imgUrl: String? = null,
                    var quantity: Int = 0,
                    var price: Double = 0.0,
-                   var partnerId: String = ""){
+                   var partnerId: String = "",
+                   var sellerId: String = ""){
     //Los metodos equals y hashCode estan basados en el id, para poder diferenciar uno de otro
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

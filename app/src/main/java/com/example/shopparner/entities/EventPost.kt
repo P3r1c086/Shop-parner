@@ -11,4 +11,5 @@ class EventPost() {
     var isSuccess: Boolean = false
     var documentId: String? = null //nos servira para relacionar una imagen con un documento
     var photoUrl: String = ""
+    var sellerId: String = ""
 }
