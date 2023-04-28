@@ -203,65 +203,67 @@ class AddDialogFragment : DialogFragment(), DialogInterface.OnShowListener {
         resultLauncher.launch(intent)
     }
 
-//    /**
-//     * metodo para subir imagenes al storage
-//     */
-//    private fun uploadImage(productId: String?, callback: (EventPost)->Unit){ //que retorna Unit sig que no retorna nada
-//        //creamos una nueva instancia de EventPost, la cual va a contener el documento
-//        val eventPost = EventPost()
-//        //El sigo de Elvis, hace que en caso de que sea null, agarre el id del nuevo documento, sino
-//        // que se quede con el id del producto actual.
-//        //extraemos el id del document. Estamos reservando un lugar para que la imagen que subamos
-//        // tenga como nombre este id. Posteriormente, una vez que termine el proceso de subir vamos a
-//        // regresar ese documento para que la imagen que vayamos a subir sea asignada con el nombre
-//        // de este id y posteriormente, despues de que se suba nuestra imagen, ahora si, vamos a
-//        // agarra el mismo document id para insertar un nuevo registro
-//        eventPost.documentId = productId ?: FirebaseFirestore.getInstance().collection(Constants.COLL_PRODUCTS)
-//            .document().id
-//        //hacemos una instancia a la raiz del servidor
-//        val storageRef = FirebaseStorage.getInstance().reference
-//        //ponemos como hijo una carpeta donde almacenar las imagenes
-//            .child(Constants.PATH_PRODUCT_IMAGES)
-//        //si photoSelectedUri es != de null y binding tb
-//        photoSelectedUri?.let { uri ->
-//            binding?.let { binding ->
-//                //hacemos visible el progressbar
-//                binding.progressBar.visibility = View.VISIBLE
-//                //creamos una nueva referencia que apunta al id de la foto
-//                val photoRef = storageRef.child(eventPost.documentId!!)
-//                //comenzamos a subir la imagen. uri es photoSelectedUri
-//                photoRef.putFile(uri)
-//                        //para la barra de progreso al subir la foto
-//                    .addOnProgressListener {
-//                        //con esto obtenemos los bytes tranferidos respecto al total
-//                        val progress = (100 * it.bytesTransferred / it.totalByteCount).toInt()
-//                        it.run {
-//                            binding.progressBar.progress = progress
-//                            binding.tvProgress.text = String.format("%s%%", progress)
-//                        }
-//                    }
-//                    .addOnSuccessListener {
-//                        //extraemos la url para descargar
-//                        it.storage.downloadUrl.addOnSuccessListener { downloadUrl ->
-//                            Log.i("URL", downloadUrl.toString())
-//                            //la imagen ya ha sido subida al storage con putFile, ahora vamos a insertarla en Firestore
-//                            eventPost.isSuccess = true
-//                            eventPost.photoUrl = downloadUrl.toString()
-//                            callback(eventPost)
-//                        }
-//                    }
-//                    .addOnFailureListener{
-//                        Toast.makeText(activity, "Error al subir imagen.", Toast.LENGTH_SHORT).show()
-//                        eventPost.isSuccess = false
-//                        //hacemos que el dialog vuelva a estar disponible
-//                        enableUI(true)
-//                        callback(eventPost)
-//                    }
-//            }
-//        }
-//    }
+    /**
+     * metodo para subir imagenes al storage.
+     * trabaja con uris
+     */
+    private fun uploadImage(productId: String?, callback: (EventPost)->Unit){ //que retorna Unit sig que no retorna nada
+        //creamos una nueva instancia de EventPost, la cual va a contener el documento
+        val eventPost = EventPost()
+        //El sigo de Elvis, hace que en caso de que sea null, agarre el id del nuevo documento, sino
+        // que se quede con el id del producto actual.
+        //extraemos el id del document. Estamos reservando un lugar para que la imagen que subamos
+        // tenga como nombre este id. Posteriormente, una vez que termine el proceso de subir vamos a
+        // regresar ese documento para que la imagen que vayamos a subir sea asignada con el nombre
+        // de este id y posteriormente, despues de que se suba nuestra imagen, ahora si, vamos a
+        // agarra el mismo document id para insertar un nuevo registro
+        eventPost.documentId = productId ?: FirebaseFirestore.getInstance().collection(Constants.COLL_PRODUCTS)
+            .document().id
+        //hacemos una instancia a la raiz del servidor
+        val storageRef = FirebaseStorage.getInstance().reference
+        //ponemos como hijo una carpeta donde almacenar las imagenes
+            .child(Constants.PATH_PRODUCT_IMAGES)
+        //si photoSelectedUri es != de null y binding tb
+        photoSelectedUri?.let { uri ->
+            binding?.let { binding ->
+                //hacemos visible el progressbar
+                binding.progressBar.visibility = View.VISIBLE
+                //creamos una nueva referencia que apunta al id de la foto
+                val photoRef = storageRef.child(eventPost.documentId!!)
+                //comenzamos a subir la imagen. uri es photoSelectedUri
+                photoRef.putFile(uri)
+                        //para la barra de progreso al subir la foto
+                    .addOnProgressListener {
+                        //con esto obtenemos los bytes tranferidos respecto al total
+                        val progress = (100 * it.bytesTransferred / it.totalByteCount).toInt()
+                        it.run {
+                            binding.progressBar.progress = progress
+                            binding.tvProgress.text = String.format("%s%%", progress)
+                        }
+                    }
+                    .addOnSuccessListener {
+                        //extraemos la url para descargar
+                        it.storage.downloadUrl.addOnSuccessListener { downloadUrl ->
+                            Log.i("URL", downloadUrl.toString())
+                            //la imagen ya ha sido subida al storage con putFile, ahora vamos a insertarla en Firestore
+                            eventPost.isSuccess = true
+                            eventPost.photoUrl = downloadUrl.toString()
+                            callback(eventPost)
+                        }
+                    }
+                    .addOnFailureListener{
+                        Toast.makeText(activity, "Error al subir imagen.", Toast.LENGTH_SHORT).show()
+                        eventPost.isSuccess = false
+                        //hacemos que el dialog vuelva a estar disponible
+                        enableUI(true)
+                        callback(eventPost)
+                    }
+            }
+        }
+    }
     /**
      * metodo para subir imagenes comprimidas al storage
+     * trabaja con bitmaps
      */
     private fun uploadReducedImage(productId: String?, imageUrl: String?, callback: (EventPost)->Unit){ //que retorna Unit sig que no retorna nada
         //creamos una nueva instancia de EventPost, la cual va a contener el documento
@@ -288,8 +290,9 @@ class AddDialogFragment : DialogFragment(), DialogInterface.OnShowListener {
             val imageRef = FirebaseStorage.getInstance().reference.child(user.uid)
                 //ponemos como hijo una carpeta donde almacenar las imagenes
                 .child(Constants.PATH_PRODUCT_IMAGES)
-            //creamos una nueva referencia que apunta al id de la foto
-            val photoRef = imageRef.child(eventPost.documentId!!)
+            //creamos una nueva referencia que apunta a "image0", el cual sera el nombre de la imagen
+            // para prepararlo y que se puedan subir varias fotos de un solo producto
+            val photoRef = imageRef.child(eventPost.documentId!!).child("image0")
 
             //una vez ya sabemos que tenemos un usuario autenticado...
             eventPost.sellerId = user.uid

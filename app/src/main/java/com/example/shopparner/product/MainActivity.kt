@@ -1,11 +1,16 @@
 package com.example.shopparner.product
 
+import android.content.DialogInterface
 import android.content.Intent
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.recyclerview.widget.GridLayoutManager
@@ -20,6 +25,7 @@ import com.firebase.ui.auth.AuthUI
 import com.firebase.ui.auth.ErrorCodes
 import com.firebase.ui.auth.IdpResponse
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.ktx.analytics
 import com.google.firebase.analytics.ktx.logEvent
@@ -48,7 +54,7 @@ class MainActivity : AppCompatActivity(), OnProductListener, MainAux {
 
     private lateinit var firebaseAnalytics: FirebaseAnalytics
 
-    private val resultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
+    private val authLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
         //dentro procesamos la respuesta
         val response = IdpResponse.fromResultIntent(it.data)
         if (it.resultCode == RESULT_OK){
@@ -94,6 +100,69 @@ class MainActivity : AppCompatActivity(), OnProductListener, MainAux {
         }
     }
 
+    //cremos una variable global que nos lleve un contador general con el cual podamos mostrarle al
+    // usuario que se ha subido por ej 1 de 5 imagenes. Y una variable global con una lista de Uris
+    private var count = 0
+    private val uriList = mutableListOf<Uri>()
+    private val progressSnackbar: Snackbar by lazy {
+        //LENGTH_INDEFINITE significa que se mostrara hasta que le digamos manualmente lo contrario
+        Snackbar.make(binding.root, "", Snackbar.LENGTH_INDEFINITE)
+    }
+
+    private var galleryResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
+        if (it.resultCode == RESULT_OK){
+            if (it.data?.clipData != null){
+                //aqui ya podemos empezar a procesar cuantas fotografias han sido seleccionadas
+                count = it.data!!.clipData!!.itemCount
+
+                //con esto recolectamos las uris
+                for (i in 0..count-1){
+                    uriList.add(it.data!!.clipData!!.getItemAt(i).uri)
+                }
+                if (count > 0) uploadImage(0)//comenzamos a subir la imagen
+            }
+        }
+    }
+
+    private fun uploadImage(position: Int) {
+        //conseguimos el usuario autenticado
+        FirebaseAuth.getInstance().currentUser?.let { user ->
+            progressSnackbar.apply {
+                setText("Subiendo imagen ${position + 1} de $count...")
+                show()
+            }
+            //hacemos una instancia a la raiz del servidor
+            //creamos una nueva referencia que apunta al "image${position+1}" de la foto
+            val productRef = FirebaseStorage.getInstance().reference
+                .child(user.uid)
+                .child(Constants.PATH_PRODUCT_IMAGES)
+                .child(productSelected!!.id!!)
+                .child("image${position+1}")
+            //comenzamos a subir la imagen. uri es photoSelectedUri
+            productRef.putFile(uriList[position])
+                .addOnSuccessListener {
+                //implementamos una logica que nos pueda llevar a cabo un recorrido global por
+                // aquellas imagenes que se van subiendo a nuestro servidor
+                    if (position < count-1){
+                        uploadImage(position + 1)
+                    }else{ //cuando se llege al limite
+                        progressSnackbar.apply {
+                            setText("Imágenes subidas correctamente!")
+                            setDuration(Snackbar.LENGTH_SHORT)
+                            show()
+                        }
+                    }
+                }
+                .addOnFailureListener{
+                    progressSnackbar.apply {
+                        setText("Error al subir la imagen ${position + 1}")
+                        setDuration(Snackbar.LENGTH_LONG)
+                        show()
+                    }
+                }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -128,7 +197,7 @@ class MainActivity : AppCompatActivity(), OnProductListener, MainAux {
                     AuthUI.IdpConfig.EmailBuilder().build(),
                     AuthUI.IdpConfig.GoogleBuilder().build())
 
-                resultLauncher.launch(AuthUI.getInstance()
+                authLauncher.launch(AuthUI.getInstance()
                     .createSignInIntentBuilder()
                     .setAvailableProviders(providers)
                     .setIsSmartLockEnabled(false)//para que no aparezca el dialog con las opciones de los usuarios que ya han logueado antes
@@ -288,9 +357,33 @@ class MainActivity : AppCompatActivity(), OnProductListener, MainAux {
     }
 
     /**
-     * Metodo para borrar un producto
+     * Metodo para lanzar un dialog y elgeir entre eliminar o agregar mas fotos
      */
     override fun onLongClick(product: Product) {
+        val adapter = ArrayAdapter<String>(this, android.R.layout.select_dialog_singlechoice)
+        adapter.add("Eliminar")
+        adapter.add("Añadir fotos")
+
+        MaterialAlertDialogBuilder(this)
+            .setAdapter(adapter){ dialogInterface: DialogInterface, position: Int ->
+                when(position){
+                    0 -> confirmDeleteProduct(product)
+                    1 -> { //lanzamos un intent para poder seleccionar la galeria
+                        productSelected = product
+                        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                        //configuramos la seleccion multiple
+                        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        galleryResult.launch(intent)
+                    }
+                }
+            }
+            .show()
+    }
+
+    /**
+     * Metodo para borrar un producto
+     */
+    private fun confirmDeleteProduct(product: Product){
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.product_dialog_delete_title)
             .setMessage(R.string.product_dialog_delete_msg)
