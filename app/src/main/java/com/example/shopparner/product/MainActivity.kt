@@ -6,7 +6,6 @@ import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.MediaStore
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -35,6 +34,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageException
 
 class MainActivity : AppCompatActivity(), OnProductListener, MainAux {
 
@@ -388,36 +388,53 @@ class MainActivity : AppCompatActivity(), OnProductListener, MainAux {
             .setTitle(R.string.product_dialog_delete_title)
             .setMessage(R.string.product_dialog_delete_msg)
             .setPositiveButton(R.string.product_dialog_delete_confirm){_,_ ->
-                //hacemos una instancia a la bd
-                val db = FirebaseFirestore.getInstance()
-                //creamos una referencia a la coleccion donde estan todos los productos
-                val productRef = db.collection(Constants.COLL_PRODUCTS)
                 //ahora hay que puntualizar cual de ellos queremos eliminar
                 product.id?.let { id ->
                     product.imgUrl?.let { url ->
-                        //extraemos la referencia en base a la url
-                        //hacemos referencia a fireStorage, en concreto, al id del producto para borrarlo
-                        //ponemos como hijo una carpeta donde almacenar las imagenes
-                        val photRef = FirebaseStorage.getInstance().getReferenceFromUrl(url)
+                       try {
+                           //extraemos la referencia en base a la url
+                           //hacemos referencia a fireStorage, en concreto, al id del producto para borrarlo
+                           //ponemos como hijo una carpeta donde almacenar las imagenes
+                           val photRef = FirebaseStorage.getInstance().getReferenceFromUrl(url)
 //                        FirebaseStorage.getInstance().reference.child(Constants.PATH_PRODUCT_IMAGES).child(id)
-                        photRef
-                            .delete()
-                            .addOnSuccessListener {
-                                productRef.document(id)
-                                    //ya estamos posicionado en el documento en especifico
-                                    .delete()
-                                    .addOnFailureListener {
-                                        Toast.makeText(this, "Error al eliminar registro.", Toast.LENGTH_SHORT).show()
-                                    }
-                            }
-                            .addOnFailureListener {
-                                Toast.makeText(this, "Error al eliminar foto.", Toast.LENGTH_SHORT).show()
-                            }
+                           photRef
+                               .delete()
+                               .addOnSuccessListener {
+                                   deleteProductFromFirestore(id)
+                               }
+                               .addOnFailureListener {
+                                   //si la excepcion indica que la fotografia ya no esta en el storage
+                                   if ((it as StorageException).errorCode == StorageException.ERROR_OBJECT_NOT_FOUND){
+                                       //eliminaremos a partir de aqui el registro de firestore
+                                       deleteProductFromFirestore(id)
+                                   }else{//sino lo tomaremos como un error general
+                                       Toast.makeText(this, "Error al eliminar foto.", Toast.LENGTH_SHORT).show()
+                                   }
+                               }
+                       }catch (e: Exception){
+                           e.printStackTrace()
+                           //en caso de que no se pueda crear una referencia porque la url esta vacia,
+                           // eliminamos directamente
+                           deleteProductFromFirestore(id)
+                       }
                     }
                 }
             }
             .setNegativeButton(R.string.dialog_cancel, null)
             .show()
+    }
+
+    private fun deleteProductFromFirestore(productId: String){
+        //hacemos una instancia a la bd
+        val db = FirebaseFirestore.getInstance()
+        //creamos una referencia a la coleccion donde estan todos los productos
+        val productRef = db.collection(Constants.COLL_PRODUCTS)
+        productRef.document(productId)
+            //ya estamos posicionado en el documento en especifico
+            .delete()
+            .addOnFailureListener {
+                Toast.makeText(this, "Error al eliminar registro.", Toast.LENGTH_SHORT).show()
+            }
     }
 
     //va a devolver la variable global productSelected
